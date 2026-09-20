@@ -1,0 +1,147 @@
+# ---------------------------------------------------------------------------
+# Chimes AI platform — Layer 1 defaults.
+#
+# PORTABILITY RULE: nothing in this file may name a cloud provider, a cloud
+# StorageClass, a cloud load balancer or an IRSA/instance role. Every such
+# choice is an empty-string value overridden per environment in ../../values/.
+# A chart that installs only on EKS is not a platform, it is an EKS app.
+# ---------------------------------------------------------------------------
+
+global:
+  # "" means "use the cluster default StorageClass". Set explicitly per
+  # environment once you care which one (gp3 on EKS, local-path on RKE2).
+  storageClass: ""
+
+platform:
+  # Root credential for the gateway's admin API and virtual-key minting.
+  # Required. Pass with --set-string or a values file kept out of git.
+  gatewayMasterKey: ""
+  # Hostname the gateway is reachable on. Products are expected to hard-code
+  # exactly one base URL, so this name is the platform's public contract.
+  gatewayHost: ""
+  ingressClassName: nginx
+
+# --------------------------------------------------------------------------
+# Postgres (CloudNativePG). Requires the operator from the cluster-prep chart.
+# --------------------------------------------------------------------------
+postgres:
+  enabled: true
+  type: postgresql
+  version:
+    postgresql: "17"
+  mode: standalone
+  cluster:
+    instances: 1
+    storage:
+      size: 10Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    monitoring:
+      enabled: false
+    enablePDB: false
+  backups:
+    enabled: false
+  # One cluster, one database per consumer. Separate databases (not schemas)
+  # because LiteLLM and Langfuse both run their own migrations.
+  databases:
+    - name: litellm
+      owner: app
+    - name: langfuse
+      owner: app
+    # The knowledge/RAG plane. pgvector is declared here rather than assumed:
+    # if the base image lacks it the Database resource reports the failure
+    # instead of the first embedding write discovering it in production.
+    - name: memory
+      owner: app
+      extensions:
+        - name: vector
+
+# --------------------------------------------------------------------------
+# Gateway (LiteLLM proxy) — the OpenAI-compatible front door.
+# --------------------------------------------------------------------------
+gateway:
+  enabled: true
+
+  masterkeySecretName: chimes-gateway-masterkey
+  masterkeySecretKey: masterkey
+
+  db:
+    # Never the bundled standalone Postgres: platform state belongs in the
+    # CloudNativePG cluster above, which is the thing that gets backed up.
+    deployStandalone: false
+    useExisting: true
+    endpoint: chimes-postgres-rw
+    database: litellm
+    secret:
+      name: chimes-postgres-app
+      usernameKey: username
+      passwordKey: password
+
+  service:
+    type: ClusterIP
+    port: 4000
+
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: gateway.chimes.local
+        paths:
+          - path: /
+            pathType: Prefix
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+  # Model routing. Product-facing names on the left are the contract; what
+  # serves them on the right is swappable, which is the entire point of
+  # centralising. Overridden per environment.
+  proxy_config:
+    model_list:
+      - model_name: chimes-chat
+        litellm_params:
+          model: openai/placeholder
+          api_base: http://inference-placeholder:11434/v1
+          api_key: unused
+    general_settings:
+      master_key: os.environ/PROXY_MASTER_KEY
+    litellm_settings:
+      drop_params: true
+
+# --------------------------------------------------------------------------
+# Local inference for burn-in only. Production routes to the GPU fleet through
+# this same gateway, so products never learn where a model actually runs.
+# --------------------------------------------------------------------------
+inference:
+  enabled: false
+  image: ollama/ollama:0.12.3
+  model: qwen3:0.6b
+  service:
+    port: 11434
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      memory: 6Gi
+
+# --------------------------------------------------------------------------
+# Staged for the next increment — see docs/ROADMAP.md.
+# --------------------------------------------------------------------------
+observability:
+  enabled: false
+identity:
+  enabled: false

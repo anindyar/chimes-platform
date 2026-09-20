@@ -1,0 +1,10 @@
+cluster-prep installed.
+
+Check the CloudNativePG operator is ready before installing chimes-platform:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/cluster-prep-cloudnative-pg
+
+Confirm a default StorageClass exists (the application chart's Postgres will
+sit Pending forever without one):
+
+  kubectl get storageclass

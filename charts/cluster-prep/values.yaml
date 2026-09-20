@@ -1,0 +1,14 @@
+# CloudNativePG operator. Cluster-scoped and installed once per cluster, which
+# is exactly why it is not part of the application chart.
+cloudnative-pg:
+  enabled: true
+  crds:
+    create: true
+  config:
+    clusterWide: true
+
+# Storage is deliberately NOT templated here. Managed clusters ship a default
+# StorageClass (EKS: gp2/gp3 via the EBS CSI addon); bare RKE2 ships none at
+# all, so an on-prem cluster needs a provisioner installed first:
+#   scripts/onprem-storage.sh
+# The application chart only ever receives a StorageClass NAME as a value.

@@ -1,0 +1,46 @@
+# Environment: royinc-prod (.249) — single-node RKE2 v1.36.4, no GPU.
+# Stands in for the customer's on-prem cluster in the portability test.
+global:
+  storageClass: local-path
+
+platform:
+  gatewayHost: gateway.192.168.0.249.sslip.io
+  ingressClassName: nginx
+
+postgres:
+  cluster:
+    instances: 1              # single node: a 3-instance cluster cannot schedule
+    storage:
+      storageClass: local-path
+
+gateway:
+  ingress:
+    className: nginx
+    hosts:
+      - host: gateway.192.168.0.249.sslip.io
+        paths:
+          - path: /
+            pathType: Prefix
+  proxy_config:
+    model_list:
+      - model_name: chimes-chat
+        litellm_params:
+          model: openai/qwen3:0.6b
+          api_base: http://chimes-inference:11434/v1
+          api_key: unused
+          # Self-hosted models are NOT in LiteLLM's public cost map, so without
+          # explicit per-token costs every request is recorded at $0.00 and the
+          # per-product spend reporting that justifies centralising silently
+          # reports nothing. Numbers here are a placeholder rate; the real ones
+          # come from (GPU $/hr) / (measured tokens/hr) per model pool.
+          input_cost_per_token: 0.00000002
+          output_cost_per_token: 0.00000008
+    general_settings:
+      master_key: os.environ/PROXY_MASTER_KEY
+    litellm_settings:
+      drop_params: true
+
+inference:
+  enabled: true
+  persistence:
+    storageClass: local-path

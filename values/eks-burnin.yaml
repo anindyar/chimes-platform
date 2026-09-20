@@ -1,0 +1,31 @@
+# Environment: chimes-burnin EKS cluster (Phase B, disposable).
+# Same chart, same release, different values — that IS the portability test.
+global:
+  storageClass: gp2
+
+platform:
+  # Filled in once the ingress-nginx NLB hostname exists; sslip.io keeps DNS
+  # out of the loop on a cluster that lives for five days.
+  gatewayHost: ""
+  ingressClassName: nginx
+
+postgres:
+  cluster:
+    instances: 2              # multi-node: proves anti-affinity and zone-aware PVCs
+    storage:
+      storageClass: gp2
+
+gateway:
+  ingress:
+    className: nginx
+    hosts:
+      - host: ""
+        paths:
+          - path: /
+            pathType: Prefix
+
+# Off on EKS: paying for a CPU model on rented nodes proves nothing the
+# on-prem run has not already proven. Routes point at the same GPU fleet the
+# customer will use.
+inference:
+  enabled: false

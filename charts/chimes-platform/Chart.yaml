@@ -1,0 +1,38 @@
+apiVersion: v2
+name: chimes-platform
+description: >-
+  Layer 1 of the Chimes AI platform: the shared inference gateway, its Postgres
+  state store, and (optionally) identity and LLM observability. Deliberately
+  cloud-neutral — every cluster-coupled choice (StorageClass, IngressClass,
+  object storage, GPU) is a value, never a hard-coded assumption, so the same
+  release installs on a managed cluster and on the customer's on-prem RKE2.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  # Postgres is the platform's single stateful system: gateway spend/keys,
+  # observability, session state and (with pgvector) the knowledge plane.
+  - name: cluster
+    alias: postgres
+    version: 0.8.1
+    repository: https://cloudnative-pg.github.io/charts
+    condition: postgres.enabled
+  # The gateway is the one irreversible contract: products only ever speak
+  # OpenAI-compatible to this hostname.
+  - name: litellm-helm
+    alias: gateway
+    version: 1.101.0
+    repository: oci://ghcr.io/berriai
+    condition: gateway.enabled
+  # Both off in 0.1.0 — staged for the next increment, wired here so the
+  # dependency set is reviewable now.
+  - name: langfuse
+    alias: observability
+    version: 2.1.1
+    repository: https://langfuse.github.io/langfuse-k8s
+    condition: observability.enabled
+  - name: keycloakx
+    alias: identity
+    version: 7.3.2
+    repository: https://codecentric.github.io/helm-charts
+    condition: identity.enabled

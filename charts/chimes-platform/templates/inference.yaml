@@ -1,0 +1,102 @@
+{{- if .Values.inference.enabled }}
+{{- /*
+CPU inference for burn-in. Exists so the gateway can be proven end to end on a
+cluster with no GPU: a real model, real tokens, real latency, zero cloud spend.
+Production replaces this with routes to the GPU fleet and the gateway config is
+the only thing that changes.
+*/ -}}
+{{- if .Values.inference.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chimes-inference-models
+  labels:
+    {{- include "chimes.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.inference.persistence.size }}
+  {{- with (.Values.inference.persistence.storageClass | default .Values.global.storageClass) }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: chimes-inference
+  labels:
+    {{- include "chimes.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: chimes-inference
+  ports:
+    - name: http
+      port: {{ .Values.inference.service.port }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chimes-inference
+  labels:
+    {{- include "chimes.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chimes-inference
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chimes-inference
+        {{- include "chimes.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: ollama
+          image: {{ .Values.inference.image }}
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0:{{ .Values.inference.service.port }}"
+            - name: CHIMES_MODEL
+              value: {{ .Values.inference.model | quote }}
+          # The model is pulled by the container itself rather than baked into
+          # an image or a post-install Job: a Job would race the Service, and a
+          # custom image would make the burn-in depend on a registry we own.
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              ollama serve &
+              serve_pid=$!
+              until ollama list >/dev/null 2>&1; do sleep 2; done
+              ollama pull "$CHIMES_MODEL"
+              wait $serve_pid
+          ports:
+            - name: http
+              containerPort: {{ .Values.inference.service.port }}
+          readinessProbe:
+            # /api/tags answers as soon as the server is up; the gateway's own
+            # health check is what proves the model actually loads.
+            httpGet:
+              path: /api/tags
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.inference.resources | nindent 12 }}
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      volumes:
+        - name: models
+          {{- if .Values.inference.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: chimes-inference-models
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: cluster-prep
+description: >-
+  Cluster-coupled prerequisites for the Chimes AI platform. Everything in here
+  depends on WHAT the cluster is (storage backend, operators, GPU hardware) and
+  is therefore expected to differ between the on-prem RKE2 target and any
+  managed cluster. The portable application stack lives in the chimes-platform
+  chart and must never grow a dependency on a specific cluster's plumbing.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: cloudnative-pg
+    version: 0.29.0
+    repository: https://cloudnative-pg.github.io/charts
+    condition: cloudnative-pg.enabled

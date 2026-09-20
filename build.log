@@ -1,0 +1,89 @@
+=== 2026-09-19T23:02:35+04:00 cluster-prep retry ===
+Release "cluster-prep" has been upgraded. Happy Helming!
+NAME: cluster-prep
+LAST DEPLOYED: Sat Sep 19 23:02:37 2026
+NAMESPACE: cnpg-system
+STATUS: deployed
+REVISION: 2
+TEST SUITE: None
+NOTES:
+cluster-prep installed.
+
+Check the CloudNativePG operator is ready before installing chimes-platform:
+
+  kubectl -n cnpg-system rollout status deploy/cluster-prep-cloudnative-pg
+
+Confirm a default StorageClass exists (the application chart's Postgres will
+sit Pending forever without one):
+
+  kubectl get storageclass
+NAME                                           READY   STATUS    RESTARTS   AGE
+cluster-prep-cloudnative-pg-6f699847c5-xvt45   1/1     Running   0          13s
+=== 2026-09-19T23:02:57+04:00 platform deps ===
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "langfuse" chart repository
+...Successfully got an update from the "codecentric" chart repository
+...Successfully got an update from the "cnpg" chart repository
+...Successfully got an update from the "jetstack" chart repository
+...Successfully got an update from the "rancher-stable" chart repository
+Update Complete. ⎈Happy Helming!⎈
+Saving 4 charts
+Downloading cluster from repo https://cloudnative-pg.github.io/charts
+Downloading litellm-helm from repo oci://ghcr.io/berriai
+Pulled: ghcr.io/berriai/litellm-helm:1.101.0
+Digest: sha256:a3a9a8665377916a8dc721a7d0613413d8c7ed03075cf114573ea25a27111cfa
+Downloading langfuse from repo https://langfuse.github.io/langfuse-k8s
+Downloading keycloakx from repo https://codecentric.github.io/helm-charts
+Deleting outdated charts
+cluster-0.8.1.tgz
+keycloakx-7.3.2.tgz
+langfuse-2.1.1.tgz
+litellm-helm-1.101.0.tgz
+=== 2026-09-19T23:03:19+04:00 platform install ===
+Release "chimes" does not exist. Installing it now.
+=== 2026-09-19T23:06:35+04:00 coredns upstream fix ===
+wrote /var/lib/rancher/rke2/server/manifests/rke2-coredns-config.yaml — waiting for the helm controller to reconcile
+NAME: chimes
+LAST DEPLOYED: Sat Sep 19 23:03:19 2026
+NAMESPACE: chimes-platform
+STATUS: deployed
+REVISION: 1
+NOTES:
+Chimes AI platform layer 1 installed as release chimes.
+
+Gateway base URL for products:
+
+  https://gateway.192.168.0.249.sslip.io
+
+Smoke test (from inside the cluster):
+
+  kubectl -n chimes-platform run curl --rm -it --image curlimages/curl --restart=Never -- \
+    curl -s http://chimes-litellm:4000/health/readiness
+deployment.apps/rke2-coredns-rke2-coredns restarted
+Waiting for deployment "rke2-coredns-rke2-coredns" rollout to finish: 0 of 1 updated replicas are available...
+Waiting for deployment "rke2-coredns-rke2-coredns" rollout to finish: 0 of 1 updated replicas are available...
+=== 2026-09-19T23:09:36+04:00 upgrade: model cost map ===
+deployment "rke2-coredns-rke2-coredns" successfully rolled out
+Release "chimes" has been upgraded. Happy Helming!
+NAME: chimes
+LAST DEPLOYED: Sat Sep 19 23:09:36 2026
+NAMESPACE: chimes-platform
+STATUS: deployed
+REVISION: 2
+NOTES:
+Chimes AI platform layer 1 installed as release chimes.
+
+Gateway base URL for products:
+
+  https://gateway.192.168.0.249.sslip.io
+
+Smoke test (from inside the cluster):
+
+  kubectl -n chimes-platform run curl --rm -it --image curlimages/curl --restart=Never -- \
+    curl -s http://chimes-litellm:4000/health/readiness
+NAME                               READY   STATUS        RESTARTS        AGE
+chimes-inference-9bf669fc7-8nnvm   1/1     Running       5 (3m30s ago)   7m10s
+chimes-litellm-798495bb7d-zlxxj    1/1     Running       0               52s
+chimes-litellm-bd4d5cb5f-crpvc     1/1     Terminating   1 (5m6s ago)    7m10s
+chimes-litellm-migrations-g8h2t    1/1     Running       0               52s
+chimes-postgres-1                  1/1     Running       0               5m21s
